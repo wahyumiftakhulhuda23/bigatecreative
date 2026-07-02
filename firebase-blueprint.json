@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "Admin authorization entry",
+      "type": "object",
+      "properties": {
+        "pin": { "type": "string" },
+        "authorizedAt": { "type": "number" }
+      },
+      "required": ["pin", "authorizedAt"]
+    },
+    "Tutorial": {
+      "title": "Tutorial",
+      "description": "Video SOP tutorial",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "url": { "type": "string" },
+        "division": { "type": "string" }
+      },
+      "required": ["title", "url", "division"]
+    },
+    "Sheet": {
+      "title": "Sheet",
+      "description": "Spreadsheet document tracking projects or accounts",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "columns": { "type": "array" },
+        "rows": { "type": "array" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["name", "columns", "rows", "createdAt"]
+    },
+    "TeamMember": {
+      "title": "TeamMember",
+      "description": "Bigate team roster profile",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "position": { "type": "string" },
+        "jobdesk": { "type": "string" },
+        "whatsapp": { "type": "string" }
+      },
+      "required": ["name", "phone", "position", "jobdesk", "whatsapp"]
+    }
+  },
+  "firestore": {
+    "/admins/{uid}": {
+      "schema": "Admin",
+      "description": "Collection of authorized admins"
+    },
+    "/tutorials/{tutorialId}": {
+      "schema": "Tutorial",
+      "description": "Collection of video SOPs"
+    },
+    "/sheets/{sheetId}": {
+      "schema": "Sheet",
+      "description": "Collection of project spreadsheets"
+    },
+    "/account_sheets/{sheetId}": {
+      "schema": "Sheet",
+      "description": "Collection of account database spreadsheets"
+    },
+    "/team_members/{memberId}": {
+      "schema": "TeamMember",
+      "description": "Collection of team roster profiles"
+    }
+  }
+}

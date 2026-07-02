@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (default-deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 1. Admins Collection
+    match /admins/{uid} {
+      allow read, delete: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn() 
+        && request.auth.uid == uid
+        && request.resource.data.pin == "123123123"
+        && request.resource.data.authorizedAt is number;
+      allow update: if false; // Admins are immutable once registered with valid PIN
+    }
+
+    // 2. Tutorials Collection
+    match /tutorials/{tutorialId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() && isValidId(tutorialId);
+    }
+
+    // 3. Sheets Collection
+    match /sheets/{sheetId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() && isValidId(sheetId);
+    }
+
+    // 4. Account Sheets Collection
+    match /account_sheets/{sheetId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() && isValidId(sheetId);
+    }
+
+    // 5. Team Members Collection
+    match /team_members/{memberId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin() && isValidId(memberId);
+    }
+  }
+}

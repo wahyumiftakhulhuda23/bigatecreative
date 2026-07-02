@@ -27,6 +27,40 @@ import {
   RefreshCw
 } from 'lucide-react';
 
+// Firebase Imports
+import { initializeApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebase/auth';
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  collection, 
+  onSnapshot, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc,
+  getDocFromServer
+} from 'firebase/firestore';
+import firebaseConfig from '../firebase-applet-config.json';
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || "(default)");
+
+// Test Connection to Firestore as required by SKILL.md
+async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.error("Please check your Firebase configuration.");
+    }
+  }
+}
+testConnection();
+
 // ============================================================================
 // DEFAULT INITIALIZATION DATA
 // ============================================================================
@@ -149,6 +183,65 @@ const getThumbnailUrl = (url: string) => {
   return null;
 };
 
+// Seeding function
+const checkAndSeedDatabase = async () => {
+  // Check tutorials
+  try {
+    const tutSnap = await getDoc(doc(db, 'tutorials', 'tut_1'));
+    if (!tutSnap.exists()) {
+      for (const tut of DEFAULT_TUTORIALS) {
+        await setDoc(doc(db, 'tutorials', tut.id), {
+          title: tut.title,
+          url: tut.url,
+          division: tut.division
+        });
+      }
+    }
+
+    // Check sheets
+    const sheetSnap = await getDoc(doc(db, 'sheets', 'sheet_1'));
+    if (!sheetSnap.exists()) {
+      for (const sheet of DEFAULT_PROJECT_SHEETS) {
+        await setDoc(doc(db, 'sheets', sheet.id), {
+          name: sheet.name,
+          columns: sheet.columns,
+          rows: sheet.rows,
+          createdAt: sheet.createdAt
+        });
+      }
+    }
+
+    // Check account sheets
+    const accSnap = await getDoc(doc(db, 'account_sheets', 'acc_sheet_1'));
+    if (!accSnap.exists()) {
+      for (const sheet of DEFAULT_ACCOUNT_SHEETS) {
+        await setDoc(doc(db, 'account_sheets', sheet.id), {
+          name: sheet.name,
+          columns: sheet.columns,
+          rows: sheet.rows,
+          createdAt: sheet.createdAt
+        });
+      }
+    }
+
+    // Check team members
+    const teamSnap = await getDoc(doc(db, 'team_members', 'team_1'));
+    if (!teamSnap.exists()) {
+      for (const member of DEFAULT_TEAM_MEMBERS) {
+        await setDoc(doc(db, 'team_members', member.id), {
+          name: member.name,
+          position: member.position,
+          phone: member.phone,
+          whatsapp: member.whatsapp,
+          jobdesk: member.jobdesk
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Autoseeding skipped or failed (unauthorized standard user). This is expected if the user is not Admin.", err);
+  }
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('beranda');
 
@@ -171,54 +264,27 @@ export default function App() {
     return cached ? JSON.parse(cached) : {};
   });
 
-  // Tutorials State
-  const [tutorials, setTutorials] = useState<any[]>(() => {
-    const cached = localStorage.getItem('bigate_tutorials');
-    return cached ? JSON.parse(cached) : DEFAULT_TUTORIALS;
-  });
-  const [selectedVideo, setSelectedVideo] = useState<any>(() => {
-    const cached = localStorage.getItem('bigate_tutorials');
-    const list = cached ? JSON.parse(cached) : DEFAULT_TUTORIALS;
-    return list.length > 0 ? list[0] : null;
-  });
+  // Database and Real-time States
+  const [tutorials, setTutorials] = useState<any[]>([]);
+  const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [showAddVideoModal, setShowAddVideoModal] = useState(false);
   const [newVideo, setNewVideo] = useState({ title: '', url: '', division: '' });
 
-  // Project Spreadsheet State
-  const [sheets, setSheets] = useState<any[]>(() => {
-    const cached = localStorage.getItem('bigate_project_sheets');
-    return cached ? JSON.parse(cached) : DEFAULT_PROJECT_SHEETS;
-  });
-  const [activeSheetId, setActiveSheetId] = useState<string>(() => {
-    const cached = localStorage.getItem('bigate_project_sheets');
-    const list = cached ? JSON.parse(cached) : DEFAULT_PROJECT_SHEETS;
-    return list.length > 0 ? list[0].id : '';
-  });
+  const [sheets, setSheets] = useState<any[]>([]);
+  const [activeSheetId, setActiveSheetId] = useState<string>('');
   const [showAddSheetModal, setShowAddSheetModal] = useState(false);
   const [newSheetName, setNewSheetName] = useState('');
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
   const [newColumn, setNewColumn] = useState({ name: '', type: 'text' });
 
-  // Database Account State
-  const [accountSheets, setAccountSheets] = useState<any[]>(() => {
-    const cached = localStorage.getItem('bigate_account_sheets');
-    return cached ? JSON.parse(cached) : DEFAULT_ACCOUNT_SHEETS;
-  });
-  const [activeAccountSheetId, setActiveAccountSheetId] = useState<string>(() => {
-    const cached = localStorage.getItem('bigate_account_sheets');
-    const list = cached ? JSON.parse(cached) : DEFAULT_ACCOUNT_SHEETS;
-    return list.length > 0 ? list[0].id : '';
-  });
+  const [accountSheets, setAccountSheets] = useState<any[]>([]);
+  const [activeAccountSheetId, setActiveAccountSheetId] = useState<string>('');
   const [showAddAccountSheetModal, setShowAddAccountSheetModal] = useState(false);
   const [newAccountSheetName, setNewAccountSheetName] = useState('');
   const [showAddAccountColumnModal, setShowAddAccountColumnModal] = useState(false);
   const [newAccountColumn, setNewAccountColumn] = useState({ name: '', type: 'text' });
 
-  // Roster Team State
-  const [teamMembers, setTeamMembers] = useState<any[]>(() => {
-    const cached = localStorage.getItem('bigate_team_members');
-    return cached ? JSON.parse(cached) : DEFAULT_TEAM_MEMBERS;
-  });
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [newMember, setNewMember] = useState({
     name: '',
     phone: '',
@@ -239,24 +305,126 @@ export default function App() {
   };
 
   // ============================================================================
-  // SYNCHRONIZATION WITH LOCALSTORAGE
+  // FIREBASE REALTIME SYNC & LIFECYCLE
   // ============================================================================
   useEffect(() => {
-    localStorage.setItem('bigate_tutorials', JSON.stringify(tutorials));
-  }, [tutorials]);
+    // 1. Listen to tutorials SOP (Publicly accessible)
+    const unsubTut = onSnapshot(collection(db, 'tutorials'), (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      setTutorials(list);
+      if (list.length > 0) {
+        setSelectedVideo((prev: any) => {
+          if (!prev) return list[0];
+          const updated = list.find(v => v.id === prev.id);
+          return updated || list[0];
+        });
+      } else {
+        setSelectedVideo(null);
+      }
+    }, (error) => {
+      console.error("Error listening to tutorials:", error);
+    });
+
+    // 2. Listen to sheets (Publicly accessible)
+    const unsubSheets = onSnapshot(collection(db, 'sheets'), (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      setSheets(list);
+      if (list.length > 0) {
+        setActiveSheetId((prev) => {
+          if (list.find(s => s.id === prev)) return prev;
+          return list[0].id;
+        });
+      }
+    }, (error) => {
+      console.error("Error listening to sheets:", error);
+    });
+
+    // 3. Listen to account sheets (Publicly accessible)
+    const unsubAccSheets = onSnapshot(collection(db, 'account_sheets'), (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      setAccountSheets(list);
+      if (list.length > 0) {
+        setActiveAccountSheetId((prev) => {
+          if (list.find(s => s.id === prev)) return prev;
+          return list[0].id;
+        });
+      }
+    }, (error) => {
+      console.error("Error listening to account sheets:", error);
+    });
+
+    // 4. Listen to team roster (Publicly accessible)
+    const unsubTeam = onSnapshot(collection(db, 'team_members'), (snapshot) => {
+      const list: any[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      setTeamMembers(list);
+    }, (error) => {
+      console.error("Error listening to team members:", error);
+    });
+
+    return () => {
+      unsubTut();
+      unsubSheets();
+      unsubAccSheets();
+      unsubTeam();
+    };
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('bigate_project_sheets', JSON.stringify(sheets));
-  }, [sheets]);
+    let unsubAdmin: (() => void) | null = null;
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
+      if (unsubAdmin) {
+        unsubAdmin();
+        unsubAdmin = null;
+      }
+      if (u) {
+        // Listen to admin status in firestore to prevent state bypass
+        unsubAdmin = onSnapshot(doc(db, 'admins', u.uid), (docSnap) => {
+          if (docSnap.exists() && docSnap.data().pin === '123123123') {
+            setIsAuthorized(true);
+            sessionStorage.setItem('bigate_authorized', 'true');
+          } else {
+            setIsAuthorized(false);
+            sessionStorage.removeItem('bigate_authorized');
+          }
+        }, (error) => {
+          console.error("Error listening to admin status:", error);
+        });
+      } else {
+        setIsAuthorized(false);
+        sessionStorage.removeItem('bigate_authorized');
+      }
+    });
 
+    return () => {
+      unsubAuth();
+      if (unsubAdmin) {
+        unsubAdmin();
+      }
+    };
+  }, []);
+
+  // Run autoseed on startup if Admin is authorized
   useEffect(() => {
-    localStorage.setItem('bigate_account_sheets', JSON.stringify(accountSheets));
-  }, [accountSheets]);
+    if (isAuthorized) {
+      checkAndSeedDatabase();
+    }
+  }, [isAuthorized]);
 
-  useEffect(() => {
-    localStorage.setItem('bigate_team_members', JSON.stringify(teamMembers));
-  }, [teamMembers]);
-
+  // Save display widths and heights locally since they are specific to each client device's screen size
   useEffect(() => {
     localStorage.setItem('bigate_col_widths', JSON.stringify(colWidths));
   }, [colWidths]);
@@ -279,44 +447,52 @@ export default function App() {
     }
   };
 
-  const handlePinSubmit = (e: React.FormEvent) => {
+  const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pinInput === '123123123') {
-      setIsAuthorized(true);
-      sessionStorage.setItem('bigate_authorized', 'true');
-      setShowPinModal(false);
-      setPinError('');
-      showToast("Kredensial Admin Diizinkan!", "success");
-      if (pinAction) {
-        pinAction();
+      try {
+        let uid = auth.currentUser?.uid;
+        if (!uid) {
+          const provider = new GoogleAuthProvider();
+          const result = await signInWithPopup(auth, provider);
+          uid = result.user.uid;
+        }
+        if (!uid) {
+          setPinError("Gagal mengidentifikasi pengguna.");
+          return;
+        }
+        await setDoc(doc(db, 'admins', uid), {
+          pin: pinInput,
+          authorizedAt: Date.now()
+        });
+        setIsAuthorized(true);
+        sessionStorage.setItem('bigate_authorized', 'true');
+        setShowPinModal(false);
+        setPinError('');
+        showToast("Kredensial Admin Diizinkan!", "success");
+        if (pinAction) {
+          pinAction();
+        }
+      } catch (err) {
+        console.error(err);
+        setPinError("Gagal masuk dengan Google. Pastikan popup login diselesaikan.");
       }
     } else {
       setPinError("PIN Salah! Akses ditolak.");
     }
   };
 
-  const handleResetAuthorization = () => {
+  const handleResetAuthorization = async () => {
+    if (auth.currentUser) {
+      try {
+        await deleteDoc(doc(db, 'admins', auth.currentUser.uid));
+      } catch (err) {
+        console.error("Error removing admin doc:", err);
+      }
+    }
     setIsAuthorized(false);
     sessionStorage.removeItem('bigate_authorized');
     showToast("Akses admin berhasil dikunci.", "info");
-  };
-
-  // Reset Database Utility
-  const handleResetDatabase = () => {
-    verifyPIN(() => {
-      if (window.confirm("Apakah Anda yakin ingin menyetel ulang database ke data default bawaan? Semua inputan kustom akan ditimpa.")) {
-        setTutorials(DEFAULT_TUTORIALS);
-        setSelectedVideo(DEFAULT_TUTORIALS[0]);
-        setSheets(DEFAULT_PROJECT_SHEETS);
-        setActiveSheetId(DEFAULT_PROJECT_SHEETS[0].id);
-        setAccountSheets(DEFAULT_ACCOUNT_SHEETS);
-        setActiveAccountSheetId(DEFAULT_ACCOUNT_SHEETS[0].id);
-        setTeamMembers(DEFAULT_TEAM_MEMBERS);
-        setColWidths({});
-        setRowHeights({});
-        showToast("Database berhasil direset ke data default!", "success");
-      }
-    });
   };
 
   // ============================================================================
@@ -365,7 +541,7 @@ export default function App() {
   // ============================================================================
   // TUTORIAL HANDLERS (BERANDA)
   // ============================================================================
-  const handleAddVideo = (e: React.FormEvent) => {
+  const handleAddVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVideo.title || !newVideo.url || !newVideo.division) {
       showToast("Harap lengkapi semua bidang video tutorial", "warning");
@@ -391,36 +567,29 @@ export default function App() {
     };
 
     const finalUrl = processUrl(newVideo.url);
-    const newVidObj = {
-      id: `tut_${Date.now()}`,
-      title: newVideo.title,
-      url: finalUrl,
-      division: newVideo.division
-    };
-
-    setTutorials(prev => {
-      const updated = [...prev, newVidObj];
-      if (prev.length === 0) {
-        setSelectedVideo(newVidObj);
-      }
-      return updated;
-    });
-
-    setShowAddVideoModal(false);
-    setNewVideo({ title: '', url: '', division: '' });
-    showToast("SOP Video tutorial berhasil ditambahkan!", "success");
+    
+    try {
+      await addDoc(collection(db, 'tutorials'), {
+        title: newVideo.title,
+        url: finalUrl,
+        division: newVideo.division
+      });
+      setShowAddVideoModal(false);
+      setNewVideo({ title: '', url: '', division: '' });
+      showToast("SOP Video tutorial berhasil ditambahkan!", "success");
+    } catch (err) {
+      showToast("Gagal menyimpan video. Pastikan Anda masuk sebagai Admin.", "error");
+    }
   };
 
-  const handleDeleteVideo = (id: string) => {
-    verifyPIN(() => {
-      setTutorials(prev => {
-        const filtered = prev.filter(v => v.id !== id);
-        if (selectedVideo?.id === id) {
-          setSelectedVideo(filtered.length > 0 ? filtered[0] : null);
-        }
-        return filtered;
-      });
-      showToast("SOP Video berhasil dihapus.", "success");
+  const handleDeleteVideo = async (id: string) => {
+    verifyPIN(async () => {
+      try {
+        await deleteDoc(doc(db, 'tutorials', id));
+        showToast("SOP Video berhasil dihapus.", "success");
+      } catch (err) {
+        showToast("Gagal menghapus video. Pastikan Anda masuk sebagai Admin.", "error");
+      }
     });
   };
 
@@ -432,6 +601,7 @@ export default function App() {
     return {
       sheetsList: isAccount ? accountSheets : sheets,
       setSheetsList: isAccount ? setAccountSheets : setSheets,
+      collectionName: isAccount ? 'account_sheets' : 'sheets',
       activeId: isAccount ? activeAccountSheetId : activeSheetId,
       setActiveId: isAccount ? setActiveAccountSheetId : setActiveSheetId,
       showAddSheet: isAccount ? showAddAccountSheetModal : showAddSheetModal,
@@ -446,77 +616,84 @@ export default function App() {
     };
   };
 
-  const handleAddSheetGeneric = (e: React.FormEvent, tab: string) => {
+  const handleAddSheetGeneric = async (e: React.FormEvent, tab: string) => {
     e.preventDefault();
     const ctx = getSpreadsheetContext(tab);
     if (!ctx.newSheetNameInput.trim()) return;
 
-    verifyPIN(() => {
-      const newSheetObj = {
-        id: `sheet_${Date.now()}`,
-        name: ctx.newSheetNameInput,
-        columns: [
-          { id: 'col_1', name: 'Kolom Utama', type: 'text' }
-        ],
-        rows: [
-          { id: 'row_1', data: { 'col_1': 'Data Entri Pertama' }, colors: {} }
-        ],
-        createdAt: Date.now()
-      };
+    verifyPIN(async () => {
+      try {
+        const colId = 'col_1';
+        const newSheetObj = {
+          name: ctx.newSheetNameInput,
+          columns: [
+            { id: colId, name: 'Kolom Utama', type: 'text' }
+          ],
+          rows: [
+            { id: 'row_1', data: { [colId]: 'Data Entri Pertama' }, colors: {} }
+          ],
+          createdAt: Date.now()
+        };
 
-      ctx.setSheetsList(prev => [...prev, newSheetObj]);
-      ctx.setActiveId(newSheetObj.id);
-      ctx.setShowAddSheet(false);
-      ctx.setNewSheetNameInput('');
-      showToast("Sheet baru berhasil ditambahkan!", "success");
+        const docRef = await addDoc(collection(db, ctx.collectionName), newSheetObj);
+        ctx.setActiveId(docRef.id);
+        ctx.setShowAddSheet(false);
+        ctx.setNewSheetNameInput('');
+        showToast("Sheet baru berhasil ditambahkan!", "success");
+      } catch (err) {
+        showToast("Gagal menambah sheet. Pastikan Anda masuk sebagai Admin.", "error");
+      }
     });
   };
 
-  const handleDeleteSheetGeneric = (tab: string) => {
+  const handleDeleteSheetGeneric = async (tab: string) => {
     const ctx = getSpreadsheetContext(tab);
     if (ctx.sheetsList.length <= 1) {
       showToast("Harus tersisa minimal 1 sheet aktif.", "warning");
       return;
     }
 
-    verifyPIN(() => {
-      ctx.setSheetsList(prev => {
-        const filtered = prev.filter(s => s.id !== ctx.activeId);
-        ctx.setActiveId(filtered[0].id);
-        return filtered;
-      });
-      showToast("Sheet aktif berhasil dihapus.", "success");
+    verifyPIN(async () => {
+      try {
+        await deleteDoc(doc(db, ctx.collectionName, ctx.activeId));
+        showToast("Sheet aktif berhasil dihapus.", "success");
+      } catch (err) {
+        showToast("Gagal menghapus sheet.", "error");
+      }
     });
   };
 
-  const handleAddColumnGeneric = (e: React.FormEvent, tab: string) => {
+  const handleAddColumnGeneric = async (e: React.FormEvent, tab: string) => {
     e.preventDefault();
     const ctx = getSpreadsheetContext(tab);
     const activeSheet = ctx.sheetsList.find(s => s.id === ctx.activeId);
     if (!ctx.newColInput.name.trim() || !activeSheet) return;
 
-    verifyPIN(() => {
-      const colId = `col_${Date.now()}`;
-      ctx.setSheetsList(prev => prev.map(sheet => {
-        if (sheet.id === ctx.activeId) {
-          const updatedColumns = [...sheet.columns, { id: colId, name: ctx.newColInput.name, type: ctx.newColInput.type }];
-          const updatedRows = sheet.rows.map((row: any) => ({
-            ...row,
-            data: { ...row.data, [colId]: ctx.newColInput.type === 'number' ? 0 : '' },
-            colors: { ...(row.colors || {}), [colId]: 'transparent' }
-          }));
-          return { ...sheet, columns: updatedColumns, rows: updatedRows };
-        }
-        return sheet;
-      }));
+    verifyPIN(async () => {
+      try {
+        const colId = `col_${Date.now()}`;
+        const updatedColumns = [...activeSheet.columns, { id: colId, name: ctx.newColInput.name, type: ctx.newColInput.type }];
+        const updatedRows = activeSheet.rows.map((row: any) => ({
+          ...row,
+          data: { ...row.data, [colId]: ctx.newColInput.type === 'number' ? 0 : '' },
+          colors: { ...(row.colors || {}), [colId]: 'transparent' }
+        }));
 
-      ctx.setShowAddCol(false);
-      ctx.setNewColInput({ name: '', type: 'text' });
-      showToast("Kolom baru berhasil ditambahkan!", "success");
+        await updateDoc(doc(db, ctx.collectionName, ctx.activeId), {
+          columns: updatedColumns,
+          rows: updatedRows
+        });
+
+        ctx.setShowAddCol(false);
+        ctx.setNewColInput({ name: '', type: 'text' });
+        showToast("Kolom baru berhasil ditambahkan!", "success");
+      } catch (err) {
+        showToast("Gagal menambah kolom.", "error");
+      }
     });
   };
 
-  const handleDeleteColumnGeneric = (colId: string, tab: string) => {
+  const handleDeleteColumnGeneric = async (colId: string, tab: string) => {
     const ctx = getSpreadsheetContext(tab);
     const activeSheet = ctx.sheetsList.find(s => s.id === ctx.activeId);
     if (!activeSheet) return;
@@ -526,77 +703,82 @@ export default function App() {
       return;
     }
 
-    verifyPIN(() => {
-      ctx.setSheetsList(prev => prev.map(sheet => {
-        if (sheet.id === ctx.activeId) {
-          const updatedColumns = sheet.columns.filter((c: any) => c.id !== colId);
-          const updatedRows = sheet.rows.map((row: any) => {
-            const newData = { ...row.data };
-            delete newData[colId];
-            const newColors = { ...(row.colors || {}) };
-            delete newColors[colId];
-            return { ...row, data: newData, colors: newColors };
-          });
-          return { ...sheet, columns: updatedColumns, rows: updatedRows };
-        }
-        return sheet;
-      }));
-      showToast("Kolom berhasil dihapus.", "success");
+    verifyPIN(async () => {
+      try {
+        const updatedColumns = activeSheet.columns.filter((c: any) => c.id !== colId);
+        const updatedRows = activeSheet.rows.map((row: any) => {
+          const newData = { ...row.data };
+          delete newData[colId];
+          const newColors = { ...(row.colors || {}) };
+          delete newColors[colId];
+          return { ...row, data: newData, colors: newColors };
+        });
+
+        await updateDoc(doc(db, ctx.collectionName, ctx.activeId), {
+          columns: updatedColumns,
+          rows: updatedRows
+        });
+        showToast("Kolom berhasil dihapus.", "success");
+      } catch (err) {
+        showToast("Gagal menghapus kolom.", "error");
+      }
     });
   };
 
-  const handleAddRowGeneric = (tab: string) => {
+  const handleAddRowGeneric = async (tab: string) => {
     const ctx = getSpreadsheetContext(tab);
     const activeSheet = ctx.sheetsList.find(s => s.id === ctx.activeId);
     if (!activeSheet) return;
 
-    verifyPIN(() => {
-      const rowId = `row_${Date.now()}`;
-      const emptyData: Record<string, any> = {};
-      const emptyColors: Record<string, string> = {};
+    verifyPIN(async () => {
+      try {
+        const rowId = `row_${Date.now()}`;
+        const emptyData: Record<string, any> = {};
+        const emptyColors: Record<string, string> = {};
 
-      activeSheet.columns.forEach((col: any) => {
-        emptyData[col.id] = col.type === 'number' ? 0 : '';
-        emptyColors[col.id] = 'transparent';
-      });
+        activeSheet.columns.forEach((col: any) => {
+          emptyData[col.id] = col.type === 'number' ? 0 : '';
+          emptyColors[col.id] = 'transparent';
+        });
 
-      ctx.setSheetsList(prev => prev.map(sheet => {
-        if (sheet.id === ctx.activeId) {
-          return {
-            ...sheet,
-            rows: [...sheet.rows, { id: rowId, data: emptyData, colors: emptyColors }]
-          };
-        }
-        return sheet;
-      }));
-      showToast("Baris entri baru ditambahkan.", "success");
+        await updateDoc(doc(db, ctx.collectionName, ctx.activeId), {
+          rows: [...activeSheet.rows, { id: rowId, data: emptyData, colors: emptyColors }]
+        });
+        showToast("Baris entri baru ditambahkan.", "success");
+      } catch (err) {
+        showToast("Gagal menambah baris data.", "error");
+      }
     });
   };
 
-  const handleDeleteRowGeneric = (rowId: string, tab: string) => {
+  const handleDeleteRowGeneric = async (rowId: string, tab: string) => {
     const ctx = getSpreadsheetContext(tab);
+    const activeSheet = ctx.sheetsList.find(s => s.id === ctx.activeId);
+    if (!activeSheet) return;
     
-    verifyPIN(() => {
-      ctx.setSheetsList(prev => prev.map(sheet => {
-        if (sheet.id === ctx.activeId) {
-          return {
-            ...sheet,
-            rows: sheet.rows.filter((r: any) => r.id !== rowId)
-          };
-        }
-        return sheet;
-      }));
-      showToast("Baris data dihapus.", "success");
+    verifyPIN(async () => {
+      try {
+        await updateDoc(doc(db, ctx.collectionName, ctx.activeId), {
+          rows: activeSheet.rows.filter((r: any) => r.id !== rowId)
+        });
+        showToast("Baris data dihapus.", "success");
+      } catch (err) {
+        showToast("Gagal menghapus baris data.", "error");
+      }
     });
   };
 
-  const handleCellEditGeneric = (rowId: string, colId: string, value: string, type: string, tab: string) => {
+  const handleCellEditGeneric = async (rowId: string, colId: string, value: string, type: string, tab: string) => {
     const ctx = getSpreadsheetContext(tab);
     let parsedValue: any = value;
     if (type === 'number') {
       parsedValue = value === '' ? '' : Number(value);
     }
 
+    const activeSheet = ctx.sheetsList.find(s => s.id === ctx.activeId);
+    if (!activeSheet) return;
+
+    // Update locally first for instantaneous rendering feedback
     ctx.setSheetsList(prev => prev.map(sheet => {
       if (sheet.id === ctx.activeId) {
         return {
@@ -605,10 +787,7 @@ export default function App() {
             if (row.id === rowId) {
               return {
                 ...row,
-                data: {
-                  ...row.data,
-                  [colId]: parsedValue
-                }
+                data: { ...row.data, [colId]: parsedValue }
               };
             }
             return row;
@@ -617,10 +796,33 @@ export default function App() {
       }
       return sheet;
     }));
+
+    // Perform Firestore background write
+    try {
+      const updatedRows = activeSheet.rows.map((row: any) => {
+        if (row.id === rowId) {
+          return {
+            ...row,
+            data: { ...row.data, [colId]: parsedValue }
+          };
+        }
+        return row;
+      });
+
+      await updateDoc(doc(db, ctx.collectionName, ctx.activeId), {
+        rows: updatedRows
+      });
+    } catch (err) {
+      console.error("Error editing cell:", err);
+    }
   };
 
-  const handleCellColorChangeGeneric = (rowId: string, colId: string, color: string, tab: string) => {
+  const handleCellColorChangeGeneric = async (rowId: string, colId: string, color: string, tab: string) => {
     const ctx = getSpreadsheetContext(tab);
+    const activeSheet = ctx.sheetsList.find(s => s.id === ctx.activeId);
+    if (!activeSheet) return;
+
+    // Local optimistic update
     ctx.setSheetsList(prev => prev.map(sheet => {
       if (sheet.id === ctx.activeId) {
         return {
@@ -641,12 +843,33 @@ export default function App() {
       }
       return sheet;
     }));
+
+    try {
+      const updatedRows = activeSheet.rows.map((row: any) => {
+        if (row.id === rowId) {
+          return {
+            ...row,
+            colors: {
+              ...(row.colors || {}),
+              [colId]: color
+            }
+          };
+        }
+        return row;
+      });
+
+      await updateDoc(doc(db, ctx.collectionName, ctx.activeId), {
+        rows: updatedRows
+      });
+    } catch (err) {
+      console.error("Error updating cell color in Firestore:", err);
+    }
   };
 
   // ============================================================================
   // TEAM ROSTER HANDLERS
   // ============================================================================
-  const handleAddTeamMember = (e: React.FormEvent) => {
+  const handleAddTeamMember = async (e: React.FormEvent) => {
     e.preventDefault();
     const { name, phone, position, jobdesk, whatsapp } = newMember;
     if (!name || !phone || !position || !jobdesk || !whatsapp) {
@@ -654,25 +877,30 @@ export default function App() {
       return;
     }
 
-    const newMemObj = {
-      id: `team_${Date.now()}`,
-      name,
-      phone,
-      position,
-      jobdesk,
-      whatsapp
-    };
-
-    setTeamMembers(prev => [...prev, newMemObj]);
-    setNewMember({ name: '', phone: '', position: '', jobdesk: '', whatsapp: '' });
-    setShowAddMemberModal(false);
-    showToast("Profil anggota tim berhasil disimpan!", "success");
+    try {
+      await addDoc(collection(db, 'team_members'), {
+        name,
+        phone,
+        position,
+        jobdesk,
+        whatsapp
+      });
+      setNewMember({ name: '', phone: '', position: '', jobdesk: '', whatsapp: '' });
+      setShowAddMemberModal(false);
+      showToast("Profil anggota tim berhasil disimpan!", "success");
+    } catch (err) {
+      showToast("Gagal menyimpan profil tim. Pastikan Anda masuk sebagai Admin.", "error");
+    }
   };
 
-  const handleDeleteMember = (id: string) => {
-    verifyPIN(() => {
-      setTeamMembers(prev => prev.filter(m => m.id !== id));
-      showToast("Profil tim berhasil dihapus.", "success");
+  const handleDeleteMember = async (id: string) => {
+    verifyPIN(async () => {
+      try {
+        await deleteDoc(doc(db, 'team_members', id));
+        showToast("Profil tim berhasil dihapus.", "success");
+      } catch (err) {
+        showToast("Gagal menghapus profil tim. Pastikan Anda masuk sebagai Admin.", "error");
+      }
     });
   };
 
@@ -831,19 +1059,26 @@ export default function App() {
         {/* TOP STATUS BAR */}
         <header className="h-16 border-b border-slate-900/80 bg-slate-950/45 backdrop-blur-md px-6 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
-            <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-            <span>Database Terkunci Aman (Lokal & Anti-Hilang)</span>
+            <span className={`w-2 h-2 rounded-full ${isAuthorized ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
+            <span>
+              {isAuthorized ? "Akses: Administrator (Bisa Mengubah Data)" : "Akses: Viewer (Hanya Baca - Gunakan PIN untuk Mengubah)"}
+            </span>
           </div>
           
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleResetDatabase}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-semibold rounded-lg transition-all"
-              title="Reset data kustom ke default studio"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Setel Ulang Data</span>
-            </button>
+            {isAuthorized ? (
+              <span className="text-xs bg-emerald-950 border border-emerald-800 text-emerald-400 px-3 py-1 rounded-full font-semibold">
+                Mode Admin Aktif
+              </span>
+            ) : (
+              <button
+                onClick={() => verifyPIN(() => {})}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/85 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-slate-100 text-xs font-semibold rounded-lg transition-all"
+              >
+                <Lock className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Buka Akses Admin</span>
+              </button>
+            )}
           </div>
         </header>
 
@@ -906,13 +1141,15 @@ export default function App() {
                             <h3 className="text-base sm:text-lg font-display font-bold text-white tracking-tight">{selectedVideo.title}</h3>
                           </div>
                           
-                          <button 
-                            onClick={() => handleDeleteVideo(selectedVideo.id)}
-                            className="flex items-center gap-1.5 px-3 py-2 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg border border-transparent hover:border-rose-900/40 text-xs font-semibold transition-all self-start sm:self-center shrink-0"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            <span>Hapus SOP</span>
-                          </button>
+                          {isAuthorized && (
+                            <button 
+                              onClick={() => handleDeleteVideo(selectedVideo.id)}
+                              className="flex items-center gap-1.5 px-3 py-2 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg border border-transparent hover:border-rose-900/40 text-xs font-semibold transition-all self-start sm:self-center shrink-0"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              <span>Hapus SOP</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -954,6 +1191,7 @@ export default function App() {
                                 <img 
                                   src={thumb} 
                                   alt="Thumbnail" 
+                                  referrerPolicy="no-referrer"
                                   className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" 
                                 />
                               ) : (
@@ -1058,22 +1296,24 @@ export default function App() {
 
                     <button
                       id="add-row-btn"
-                      onClick={() => handleAddRowGeneric(activeTab)}
+                      onClick={() => verifyPIN(() => handleAddRowGeneric(activeTab))}
                       className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 text-xs font-bold rounded-lg transition-all"
                     >
                       <Plus className="w-3.5 h-3.5 stroke-[3]" />
                       <span>Tambah Baris</span>
                     </button>
 
-                    <button
-                      id="delete-sheet-btn"
-                      onClick={() => handleDeleteSheetGeneric(activeTab)}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-rose-950/20 hover:bg-rose-950/55 text-rose-400 text-xs font-semibold rounded-lg border border-rose-900/30 transition-all"
-                      title="Hapus Sheet Aktif"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Hapus Sheet</span>
-                    </button>
+                    {isAuthorized && (
+                      <button
+                        id="delete-sheet-btn"
+                        onClick={() => handleDeleteSheetGeneric(activeTab)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-rose-950/20 hover:bg-rose-950/55 text-rose-400 text-xs font-semibold rounded-lg border border-rose-900/30 transition-all"
+                        title="Hapus Sheet Aktif"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Hapus Sheet</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1129,13 +1369,15 @@ export default function App() {
                                 />
 
                                 {/* Hover column delete button */}
-                                <button
-                                  onClick={() => handleDeleteColumnGeneric(col.id, activeTab)}
-                                  className="absolute top-1/2 right-3 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 bg-rose-950/95 text-rose-400 border border-rose-800/40 rounded hover:bg-rose-900 transition-all z-20"
-                                  title="Hapus Kolom"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
+                                {isAuthorized && (
+                                  <button
+                                    onClick={() => handleDeleteColumnGeneric(col.id, activeTab)}
+                                    className="absolute top-1/2 right-3 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 bg-rose-950/95 text-rose-400 border border-rose-800/40 rounded hover:bg-rose-900 transition-all z-20"
+                                    title="Hapus Kolom"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                )}
                               </th>
                             ))}
                           </tr>
@@ -1149,13 +1391,17 @@ export default function App() {
                             >
                               <td className="p-2 text-center border-r border-slate-800/80 relative">
                                 <div className="flex items-center justify-center h-full">
-                                  <button
-                                    onClick={() => handleDeleteRowGeneric(row.id, activeTab)}
-                                    className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-slate-900 rounded-lg transition-colors"
-                                    title="Hapus Baris"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                                  {isAuthorized ? (
+                                    <button
+                                      onClick={() => handleDeleteRowGeneric(row.id, activeTab)}
+                                      className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-slate-900 rounded-lg transition-colors"
+                                      title="Hapus Baris"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  ) : (
+                                    <Lock className="w-3.5 h-3.5 text-slate-600" title="Viewer (Hanya Baca)" />
+                                  )}
                                 </div>
 
                                 {/* Row height resize handle */}
@@ -1180,21 +1426,24 @@ export default function App() {
                                       <input
                                         type={col.type === 'number' ? 'number' : col.type === 'date' ? 'date' : 'text'}
                                         value={val}
+                                        disabled={!isAuthorized}
                                         onChange={(e) => handleCellEditGeneric(row.id, col.id, e.target.value, col.type, activeTab)}
-                                        className={`w-full h-full bg-transparent hover:bg-white/5 focus:bg-white/10 border-0 px-3 text-xs sm:text-sm focus:outline-none transition-all ${!cellColor ? 'text-slate-300' : ''}`}
+                                        className={`w-full h-full bg-transparent hover:bg-white/5 focus:bg-white/10 border-0 px-3 text-xs sm:text-sm focus:outline-none transition-all ${!cellColor ? 'text-slate-300' : ''} ${!isAuthorized ? 'cursor-not-allowed opacity-80' : ''}`}
                                         style={{ color: textColor || undefined }}
                                         placeholder="..."
                                       />
                                       
                                       {/* Cell color picker menu */}
-                                      <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/cell:opacity-100 w-5 h-5 rounded cursor-pointer overflow-hidden border border-slate-700/60 shadow-md z-10" title="Ubah warna latar">
-                                        <input
-                                          type="color"
-                                          value={cellColor || '#020617'}
-                                          onChange={(e) => handleCellColorChangeGeneric(row.id, col.id, e.target.value, activeTab)}
-                                          className="absolute -top-2.5 -left-2.5 w-10 h-10 cursor-pointer p-0 border-0 bg-transparent"
-                                        />
-                                      </div>
+                                      {isAuthorized && (
+                                        <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/cell:opacity-100 w-5 h-5 rounded cursor-pointer overflow-hidden border border-slate-700/60 shadow-md z-10" title="Ubah warna latar">
+                                          <input
+                                            type="color"
+                                            value={cellColor || '#020617'}
+                                            onChange={(e) => handleCellColorChangeGeneric(row.id, col.id, e.target.value, activeTab)}
+                                            className="absolute -top-2.5 -left-2.5 w-10 h-10 cursor-pointer p-0 border-0 bg-transparent"
+                                          />
+                                        </div>
+                                      )}
                                     </div>
                                   </td>
                                 );
@@ -1272,7 +1521,7 @@ export default function App() {
 
                   <button
                     id="add-team-member-btn"
-                    onClick={() => setShowAddMemberModal(true)}
+                    onClick={() => verifyPIN(() => setShowAddMemberModal(true))}
                     className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 text-xs font-bold rounded-lg transition-all"
                   >
                     <Plus className="w-4 h-4 stroke-[3]" />
@@ -1330,13 +1579,15 @@ export default function App() {
                           <span>Hubungi WA</span>
                         </a>
 
-                        <button
-                          onClick={() => handleDeleteMember(member.id)}
-                          className="p-2 text-rose-500 hover:text-rose-400 hover:bg-slate-900 rounded-lg transition-all border border-transparent hover:border-rose-950"
-                          title="Hapus Profil Tim"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {isAuthorized && (
+                          <button
+                            onClick={() => handleDeleteMember(member.id)}
+                            className="p-2 text-rose-500 hover:text-rose-400 hover:bg-slate-900 rounded-lg transition-all border border-transparent hover:border-rose-950"
+                            title="Hapus Profil Tim"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1411,7 +1662,7 @@ export default function App() {
 
           {/* FOOTER METADATA */}
           <footer className="w-full mt-16 py-6 border-t border-slate-900/80 text-center text-[11px] text-slate-500 font-mono">
-            <p>© 2026 Bigate Creative Studio. Semua Perubahan Disimpan Otomatis di Browser.</p>
+            <p>© 2026 Bigate Creative Studio. Semua Perubahan Disinkronkan Otomatis.</p>
           </footer>
 
         </main>
@@ -1436,9 +1687,6 @@ export default function App() {
                   <Lock className="w-5 h-5" />
                 </div>
                 <h3 className="text-lg font-display font-bold text-white">Konfirmasi PIN Kredensial</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Aksi pengeditan atau pembuatan sheet ini membutuhkan otorisasi PIN Admin Studio. (Gunakan PIN bawaan: <strong className="text-cyan-400 font-mono">123123123</strong>)
-                </p>
               </div>
 
               <form onSubmit={handlePinSubmit} className="space-y-4">

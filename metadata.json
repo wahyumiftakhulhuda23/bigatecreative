@@ -1,0 +1,6 @@
+{
+  "name": "Bigate Creative Management",
+  "description": "Dashboard terpadu untuk monitoring project, akun, absensi, SOP tutorial, dan data tim Bigate Creative Studio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -238,7 +238,7 @@ const checkAndSeedDatabase = async () => {
       }
     }
   } catch (err) {
-    console.error("Autoseeding skipped or failed (unauthorized standard user). This is expected if the user is not Admin.", err);
+    console.error("Autoseeding skipped or failed (unauthorized user).", err);
   }
 };
 
@@ -469,7 +469,7 @@ export default function App() {
         sessionStorage.setItem('bigate_authorized', 'true');
         setShowPinModal(false);
         setPinError('');
-        showToast("Kredensial Admin Diizinkan!", "success");
+        showToast("Akses diizinkan!", "success");
         if (pinAction) {
           pinAction();
         }
@@ -492,7 +492,7 @@ export default function App() {
     }
     setIsAuthorized(false);
     sessionStorage.removeItem('bigate_authorized');
-    showToast("Akses admin berhasil dikunci.", "info");
+    showToast("Akses berhasil dikunci.", "info");
   };
 
   // ============================================================================
@@ -578,7 +578,7 @@ export default function App() {
       setNewVideo({ title: '', url: '', division: '' });
       showToast("SOP Video tutorial berhasil ditambahkan!", "success");
     } catch (err) {
-      showToast("Gagal menyimpan video. Pastikan Anda masuk sebagai Admin.", "error");
+      showToast("Gagal menyimpan video. Pastikan PIN sudah diverifikasi.", "error");
     }
   };
 
@@ -588,7 +588,7 @@ export default function App() {
         await deleteDoc(doc(db, 'tutorials', id));
         showToast("SOP Video berhasil dihapus.", "success");
       } catch (err) {
-        showToast("Gagal menghapus video. Pastikan Anda masuk sebagai Admin.", "error");
+        showToast("Gagal menghapus video. Pastikan PIN sudah diverifikasi.", "error");
       }
     });
   };
@@ -641,7 +641,7 @@ export default function App() {
         ctx.setNewSheetNameInput('');
         showToast("Sheet baru berhasil ditambahkan!", "success");
       } catch (err) {
-        showToast("Gagal menambah sheet. Pastikan Anda masuk sebagai Admin.", "error");
+        showToast("Gagal menambah sheet. Pastikan PIN sudah diverifikasi.", "error");
       }
     });
   };
@@ -889,7 +889,7 @@ export default function App() {
       setShowAddMemberModal(false);
       showToast("Profil anggota tim berhasil disimpan!", "success");
     } catch (err) {
-      showToast("Gagal menyimpan profil tim. Pastikan Anda masuk sebagai Admin.", "error");
+      showToast("Gagal menyimpan profil tim. Pastikan PIN sudah diverifikasi.", "error");
     }
   };
 
@@ -899,7 +899,7 @@ export default function App() {
         await deleteDoc(doc(db, 'team_members', id));
         showToast("Profil tim berhasil dihapus.", "success");
       } catch (err) {
-        showToast("Gagal menghapus profil tim. Pastikan Anda masuk sebagai Admin.", "error");
+        showToast("Gagal menghapus profil tim. Pastikan PIN sudah diverifikasi.", "error");
       }
     });
   };
@@ -995,38 +995,6 @@ export default function App() {
           })}
         </nav>
 
-        {/* Floating security administrator PIN locker */}
-        <div className="p-4 mt-auto border-t border-slate-800/60 flex flex-col items-center justify-center shrink-0 gap-2 pb-6">
-          {isAuthorized ? (
-            <button 
-              id="admin-unlock-btn"
-              onClick={handleResetAuthorization}
-              className="group relative w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/50 flex items-center justify-center text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:bg-emerald-500 hover:text-slate-950 transition-all duration-300"
-              title="Admin Mode Terbuka (PIN Terverifikasi). Klik untuk mengunci kembali."
-            >
-              <Unlock className="w-5 h-5 animate-pulse" />
-              <span className="absolute left-[65px] bg-slate-900 border border-slate-800 text-slate-200 text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-lg hidden lg:block z-50">
-                Kunci Akses Admin
-              </span>
-            </button>
-          ) : (
-            <button 
-              id="admin-lock-btn"
-              onClick={() => verifyPIN(() => {})}
-              className="group relative w-12 h-12 rounded-full bg-slate-900 hover:bg-slate-850 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.1)] hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all duration-300"
-              title="Akses Terkunci. Masukkan PIN Admin (123123123) untuk mengedit data."
-            >
-              <Lock className="w-5 h-5" />
-              <span className="absolute left-[65px] bg-slate-900 border border-slate-800 text-slate-200 text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-lg hidden lg:block z-50 font-mono">
-                Buka Admin (PIN: 123123123)
-              </span>
-            </button>
-          )}
-          <span className="hidden lg:inline text-[9px] font-mono text-slate-500 text-center tracking-tight">
-            Mode: {isAuthorized ? "Administrator" : "Viewer"}
-          </span>
-        </div>
-
       </aside>
 
       {/* ============================================================================
@@ -1055,32 +1023,6 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* TOP STATUS BAR */}
-        <header className="h-16 border-b border-slate-900/80 bg-slate-950/45 backdrop-blur-md px-6 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
-            <span className={`w-2 h-2 rounded-full ${isAuthorized ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`} />
-            <span>
-              {isAuthorized ? "Akses: Administrator (Bisa Mengubah Data)" : "Akses: Viewer (Hanya Baca - Gunakan PIN untuk Mengubah)"}
-            </span>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            {isAuthorized ? (
-              <span className="text-xs bg-emerald-950 border border-emerald-800 text-emerald-400 px-3 py-1 rounded-full font-semibold">
-                Mode Admin Aktif
-              </span>
-            ) : (
-              <button
-                onClick={() => verifyPIN(() => {})}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/85 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-slate-100 text-xs font-semibold rounded-lg transition-all"
-              >
-                <Lock className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Buka Akses Admin</span>
-              </button>
-            )}
-          </div>
-        </header>
 
         {/* WORKSPACE CANVAS CONTAINER */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
@@ -1141,7 +1083,6 @@ export default function App() {
                             <h3 className="text-base sm:text-lg font-display font-bold text-white tracking-tight">{selectedVideo.title}</h3>
                           </div>
                           
-                          {isAuthorized && (
                             <button 
                               onClick={() => handleDeleteVideo(selectedVideo.id)}
                               className="flex items-center gap-1.5 px-3 py-2 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-lg border border-transparent hover:border-rose-900/40 text-xs font-semibold transition-all self-start sm:self-center shrink-0"
@@ -1149,7 +1090,6 @@ export default function App() {
                               <Trash2 className="w-4 h-4" />
                               <span>Hapus SOP</span>
                             </button>
-                          )}
                         </div>
                       </div>
                     ) : (
@@ -1303,17 +1243,15 @@ export default function App() {
                       <span>Tambah Baris</span>
                     </button>
 
-                    {isAuthorized && (
-                      <button
-                        id="delete-sheet-btn"
-                        onClick={() => handleDeleteSheetGeneric(activeTab)}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-rose-950/20 hover:bg-rose-950/55 text-rose-400 text-xs font-semibold rounded-lg border border-rose-900/30 transition-all"
-                        title="Hapus Sheet Aktif"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Hapus Sheet</span>
-                      </button>
-                    )}
+                    <button
+                      id="delete-sheet-btn"
+                      onClick={() => handleDeleteSheetGeneric(activeTab)}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-rose-950/20 hover:bg-rose-950/55 text-rose-400 text-xs font-semibold rounded-lg border border-rose-900/30 transition-all"
+                      title="Hapus Sheet Aktif"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Hapus Sheet</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1369,15 +1307,13 @@ export default function App() {
                                 />
 
                                 {/* Hover column delete button */}
-                                {isAuthorized && (
-                                  <button
-                                    onClick={() => handleDeleteColumnGeneric(col.id, activeTab)}
-                                    className="absolute top-1/2 right-3 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 bg-rose-950/95 text-rose-400 border border-rose-800/40 rounded hover:bg-rose-900 transition-all z-20"
-                                    title="Hapus Kolom"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => handleDeleteColumnGeneric(col.id, activeTab)}
+                                  className="absolute top-1/2 right-3 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 bg-rose-950/95 text-rose-400 border border-rose-800/40 rounded hover:bg-rose-900 transition-all z-20"
+                                  title="Hapus Kolom"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
                               </th>
                             ))}
                           </tr>
@@ -1391,7 +1327,6 @@ export default function App() {
                             >
                               <td className="p-2 text-center border-r border-slate-800/80 relative">
                                 <div className="flex items-center justify-center h-full">
-                                  {isAuthorized ? (
                                     <button
                                       onClick={() => handleDeleteRowGeneric(row.id, activeTab)}
                                       className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-slate-900 rounded-lg transition-colors"
@@ -1399,9 +1334,6 @@ export default function App() {
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
-                                  ) : (
-                                    <Lock className="w-3.5 h-3.5 text-slate-600" title="Viewer (Hanya Baca)" />
-                                  )}
                                 </div>
 
                                 {/* Row height resize handle */}
@@ -1426,24 +1358,24 @@ export default function App() {
                                       <input
                                         type={col.type === 'number' ? 'number' : col.type === 'date' ? 'date' : 'text'}
                                         value={val}
-                                        disabled={!isAuthorized}
+                                        readOnly={!isAuthorized}
+                                        onClick={!isAuthorized ? () => verifyPIN(() => {}) : undefined}
                                         onChange={(e) => handleCellEditGeneric(row.id, col.id, e.target.value, col.type, activeTab)}
-                                        className={`w-full h-full bg-transparent hover:bg-white/5 focus:bg-white/10 border-0 px-3 text-xs sm:text-sm focus:outline-none transition-all ${!cellColor ? 'text-slate-300' : ''} ${!isAuthorized ? 'cursor-not-allowed opacity-80' : ''}`}
+                                        className={`w-full h-full bg-transparent hover:bg-white/5 focus:bg-white/10 border-0 px-3 text-xs sm:text-sm focus:outline-none transition-all ${!cellColor ? 'text-slate-300' : ''}`}
                                         style={{ color: textColor || undefined }}
                                         placeholder="..."
                                       />
                                       
                                       {/* Cell color picker menu */}
-                                      {isAuthorized && (
-                                        <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/cell:opacity-100 w-5 h-5 rounded cursor-pointer overflow-hidden border border-slate-700/60 shadow-md z-10" title="Ubah warna latar">
-                                          <input
-                                            type="color"
-                                            value={cellColor || '#020617'}
-                                            onChange={(e) => handleCellColorChangeGeneric(row.id, col.id, e.target.value, activeTab)}
-                                            className="absolute -top-2.5 -left-2.5 w-10 h-10 cursor-pointer p-0 border-0 bg-transparent"
-                                          />
-                                        </div>
-                                      )}
+                                      <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover/cell:opacity-100 w-5 h-5 rounded cursor-pointer overflow-hidden border border-slate-700/60 shadow-md z-10" title="Ubah warna latar">
+                                        <input
+                                          type="color"
+                                          value={cellColor || '#020617'}
+                                          onClick={!isAuthorized ? (e) => { e.preventDefault(); verifyPIN(() => {}); } : undefined}
+                                          onChange={(e) => handleCellColorChangeGeneric(row.id, col.id, e.target.value, activeTab)}
+                                          className="absolute -top-2.5 -left-2.5 w-10 h-10 cursor-pointer p-0 border-0 bg-transparent"
+                                        />
+                                      </div>
                                     </div>
                                   </td>
                                 );
@@ -1579,7 +1511,6 @@ export default function App() {
                           <span>Hubungi WA</span>
                         </a>
 
-                        {isAuthorized && (
                           <button
                             onClick={() => handleDeleteMember(member.id)}
                             className="p-2 text-rose-500 hover:text-rose-400 hover:bg-slate-900 rounded-lg transition-all border border-transparent hover:border-rose-950"
@@ -1587,7 +1518,6 @@ export default function App() {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
-                        )}
                       </div>
                     </div>
                   ))}
@@ -1693,7 +1623,7 @@ export default function App() {
                 <div>
                   <input
                     type="password"
-                    placeholder="Masukkan PIN Admin"
+                    placeholder="Masukkan PIN"
                     value={pinInput}
                     onChange={(e) => setPinInput(e.target.value)}
                     className="w-full h-11 bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-4 text-center font-mono tracking-widest text-lg text-white focus:outline-none focus:ring-1 focus:ring-cyan-500"
